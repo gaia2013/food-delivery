@@ -11,6 +11,7 @@ class MyApp extends App {
 
   state = {
     user: null,
+    cart: { items: [], total: 0 },
   }
   setUser = (user) => {
     this.setState({ user })
@@ -19,6 +20,17 @@ class MyApp extends App {
   // すでにクッキー情報が残っているかを確認する
   componentDidMount() {
     const token = Cookies.get('token') //tokenの中にjwtが入っている
+    const cart = Cookies.get('cart')
+
+    // console.log(cart)
+
+    if (cart !== 'undefined') {
+      JSON.parse(cart).forEach((item) => {
+        this.setState({
+          cart: { items: JSON.parse(cart), total: this.state.cart.total += item.price * item.quantity },
+        })
+      })
+    }
 
     if (token) {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me`, {
@@ -37,11 +49,89 @@ class MyApp extends App {
     }
   }
 
+  addItem = (item) => {
+    let { items } = this.state.cart
+    const newItem = items.find((i) => i.id === item.id)
+    // console.log(newItem)
+    if (!newItem) {
+      item.quantity = 1
+      // cartに追加する
+      this.setState(
+        {
+          cart: {
+            items: [...items, item],
+            total: this.state.cart.total + item.price,
+          },
+        },
+        () => Cookies.set('cart', this.state.cart.items)
+      )
+      // すでに同じ商品がカートに入っている時
+    } else {
+      this.setState(
+        {
+          cart: {
+            items: this.state.cart.items.map((item) =>
+              item.id === newItem.id
+                ? Object.assign({}, item, { quantity: item.quantity + 1 })
+                : item
+            ),
+            total: this.state.cart.total + item.price,
+          },
+        },
+        () => Cookies.set('cart', this.state.items)
+      )
+    }
+  }
+
+  removeItem = (item) => {
+    let { items } = this.state.cart
+    const newItem = items.find((i) => i.id === item.id)
+    if (newItem.quantity > 1) {
+      this.setState(
+        {
+          cart: {
+            items: this.state.cart.items.map((item) =>
+              item.id === newItem.id
+                ? Object.assign({}, item, { quantity: item.quantity - 1 })
+                : item
+            ),
+            total: this.state.cart.total - item.price,
+          },
+        },
+        () => Cookies.set('cart', this.state.cart.items)
+      )
+    }
+    // カートに入っているその商品が１つの場合
+    else {
+      const items = [...this.state.cart.items]
+      const index = items.findIndex((i) => i.id === newItem.id)
+
+      items.splice(index, 1)
+
+      this.setState(
+        {
+          cart: {
+            items: items,
+            total: this.state.cart.total - item.price,
+          },
+        },
+        () => Cookies.set('cart', this.state.items)
+      )
+    }
+  }
+
   render() {
     const { Component, pageProps } = this.props
     return (
+      // thisはMyAppクラス自身を指す
       <AppContext.Provider
-        value={{ user: this.state.user, setUser: this.setUser }}
+        value={{
+          user: this.state.user,
+          cart: this.state.cart,
+          setUser: this.setUser,
+          addItem: this.addItem,
+          removeItem: this.removeItem,
+        }}
       >
         <>
           <Head>
